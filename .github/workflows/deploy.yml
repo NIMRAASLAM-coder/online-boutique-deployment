@@ -81,8 +81,8 @@ jobs:
       - name: Build and push Docker image for ${{ matrix.service }}
         uses: docker/build-push-action@v4
         with:
-          context: ./src/${{ matrix.context }}
-          file: ./src/${{ matrix.dockerfile }}
+          context: {{ matrix.context }}
+          file: {{ matrix.dockerfile }}
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
