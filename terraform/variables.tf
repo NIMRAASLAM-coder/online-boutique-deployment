@@ -40,7 +40,7 @@ variable "private_subnet_cidr" {
 variable "instance_type" {
   description = "EC2 instance type"
   type        = string
-  default     = "t3.medium"
+  default     = "m7i-flex.large"
   # Options: t3.small (1 vCPU, 2GB RAM), t3.medium (1 vCPU, 4GB RAM), 
   #          t3.large (2 vCPU, 8GB RAM), t3.xlarge (4 vCPU, 16GB RAM)
 }
