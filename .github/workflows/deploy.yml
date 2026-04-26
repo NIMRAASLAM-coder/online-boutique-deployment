@@ -28,7 +28,7 @@ jobs:
             context: ./src/adservice
             dockerfile: ./src/adservice/Dockerfile
           - service: cartservice
-            context: ./src/cartservice
+            context: ./src/cartservice/src
             dockerfile: ./src/cartservice/src/Dockerfile # Specific path for .NET
           - service: checkoutservice
             context: ./src/checkoutservice
