@@ -1,12 +1,4 @@
-# File: kubernetes/namespace.yaml
-# Kubernetes namespace for the Online Boutique application
-# A namespace is like a virtual cluster within a cluster
-
 apiVersion: v1
 kind: Namespace
 metadata:
   name: boutique
-  labels:
-    app: online-boutique
-    environment: production
-
