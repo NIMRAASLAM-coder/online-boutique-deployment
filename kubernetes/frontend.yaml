@@ -1,6 +1,3 @@
-# File: kubernetes/frontend.yaml
-# Frontend Service and Deployment
-
 ---
 apiVersion: v1
 kind: Service
@@ -10,7 +7,7 @@ metadata:
   labels:
     app: frontend
 spec:
-  type: LoadBalancer  # Exposes the service externally
+  type: LoadBalancer
   ports:
   - name: http
     port: 80
@@ -29,7 +26,7 @@ metadata:
   labels:
     app: frontend
 spec:
-  replicas: 2  # Run 2 instances for high availability
+  replicas: 2
   selector:
     matchLabels:
       app: frontend
@@ -45,26 +42,30 @@ spec:
     spec:
       containers:
       - name: frontend
-        # IMPORTANT: Replace i221164nimra with your actual Docker Hub username
         image: gcr.io/google-samples/microservices-demo/frontend:v0.3.9
         imagePullPolicy: Always
         ports:
         - containerPort: 3000
           name: http
-        
         env:
         - name: LOG_LEVEL
-          valueFrom:
-            configMapKeyRef:
-              name: online-boutique-config
-              key: LOG_LEVEL
+          value: "info"
         - name: FRONTEND_ADDR
-          valueFrom:
-            configMapKeyRef:
-              name: online-boutique-config
-              key: FRONTEND_ADDR
-        
-        # Resource requests and limits
+          value: "0.0.0.0:3000"
+        - name: AD_SERVICE_ADDR
+          value: "adservice:9090"
+        - name: CART_SERVICE_ADDR
+          value: "cartservice:7070"
+        - name: CHECKOUT_SERVICE_ADDR
+          value: "checkoutservice:5050"
+        - name: CURRENCY_SERVICE_ADDR
+          value: "currencyservice:7000"
+        - name: PRODUCT_CATALOG_SERVICE_ADDR
+          value: "productcatalogservice:3550"
+        - name: RECOMMENDATION_SERVICE_ADDR
+          value: "recommendationservice:8080"
+        - name: SHIPPING_SERVICE_ADDR
+          value: "shippingservice:50051"
         resources:
           requests:
             cpu: 100m
@@ -72,8 +73,6 @@ spec:
           limits:
             cpu: 200m
             memory: 256Mi
-        
-        # Liveness probe: restart if unhealthy
         livenessProbe:
           httpGet:
             path: /
@@ -82,8 +81,6 @@ spec:
           periodSeconds: 10
           timeoutSeconds: 5
           failureThreshold: 3
-        
-        # Readiness probe: don't send traffic if not ready
         readinessProbe:
           httpGet:
             path: /
@@ -92,9 +89,3 @@ spec:
           periodSeconds: 5
           timeoutSeconds: 3
           failureThreshold: 2
-	securityContext:
- 	  runAsNonRoot: false
-	  readOnlyRootFilesystem: false
-	  allowPrivilegeEscalation: true
-	  capabilities:
-	    drop: []
