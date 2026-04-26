@@ -22,24 +22,34 @@ jobs:
       matrix:
         include:
           - service: frontend
+            context: ./src/frontend
             dockerfile: ./src/frontend/Dockerfile
           - service: adservice
+            context: ./src/adservice
             dockerfile: ./src/adservice/Dockerfile
           - service: cartservice
+            context: ./src/cartservice
             dockerfile: ./src/cartservice/src/Dockerfile # Specific path for .NET
           - service: checkoutservice
+            context: ./src/checkoutservice
             dockerfile: ./src/checkoutservice/Dockerfile
           - service: currencyservice
+            context: ./src/currencyservice
             dockerfile: ./src/currencyservice/Dockerfile
           - service: emailservice
+            context: ./src/emailservice
             dockerfile: ./src/emailservice/Dockerfile
           - service: paymentservice
+            context: ./src/paymentservice
             dockerfile: ./src/paymentservice/Dockerfile
           - service: productcatalogservice
+            context: ./src/productcatalogservice
             dockerfile: ./src/productcatalogservice/Dockerfile
           - service: recommendationservice
+            context: ./src/recommendationservice
             dockerfile: ./src/recommendationservice/Dockerfile
           - service: shippingservice
+            context: ./src/shippingservice
             dockerfile: ./src/shippingservice/Dockerfile
     
     steps:
