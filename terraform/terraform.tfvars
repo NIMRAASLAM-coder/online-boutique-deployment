@@ -1,17 +1,22 @@
-# Copyright 2022 Google LLC
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#      http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# File: terraform/terraform.tfvars
+# Values for Terraform variables - customize as needed
 
-gcp_project_id = "<project_id_here>"
+aws_region        = "us-east-1"
+project_name      = "online-boutique"
+environment       = "dev"
+vpc_cidr           = "10.0.0.0/16"
+public_subnet_cidr = "10.0.1.0/24"
+private_subnet_cidr = "10.0.2.0/24"
+instance_type     = "t3.medium"
+root_volume_size  = 30
+key_pair_name     = "online-boutique"
 
-memorystore = false
+# IMPORTANT: Before running terraform apply:
+# 1. Change "online-boutique" to the name of your EC2 key pair
+# 2. The key pair must exist in AWS Console already
+# 3. If you don't have a key pair, create one:
+#    - AWS Console → EC2 → Key Pairs → Create Key Pair
+#    - Download the .pem file
+#    - Save to ~/.ssh/online-boutique.pem
+#    - chmod 600 ~/.ssh/online-boutique.pem
+

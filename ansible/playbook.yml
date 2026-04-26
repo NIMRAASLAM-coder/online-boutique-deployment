@@ -1,0 +1,256 @@
+# File: ansible/playbook.yml
+# Main Ansible playbook for EC2 configuration
+# This playbook is run AFTER Terraform creates the EC2 instance
+
+---
+- name: Configure EC2 Instance for Online Boutique
+  hosts: k8s_master
+  become: yes
+  gather_facts: yes
+
+  vars:
+    docker_compose_version: "2.14.0"
+    kubectl_version: "latest"
+    microk8s_channel: "latest/stable"
+
+  tasks:
+    # ============ BASIC SYSTEM SETUP ============
+    - name: Update apt cache
+      apt:
+        update_cache: yes
+        cache_valid_time: 3600
+
+    - name: Install basic packages
+      apt:
+        name:
+          - curl
+          - wget
+          - git
+          - vim
+          - net-tools
+          - htop
+          - tree
+          - jq
+          - unzip
+          - python3-pip
+          - python3-dev
+          - build-essential
+        state: present
+
+    - name: Upgrade all packages
+      apt:
+        upgrade: full
+        autoremove: yes
+        autoclean: yes
+
+    # ============ DOCKER SETUP ============
+    - name: Add Docker GPG key
+      apt_key:
+        url: https://download.docker.com/linux/ubuntu/gpg
+        state: present
+
+    - name: Add Docker repository
+      apt_repository:
+        repo: deb https://download.docker.com/linux/ubuntu {{ ansible_distribution_release }} stable
+        state: present
+
+    - name: Install Docker
+      apt:
+        name:
+          - docker-ce
+          - docker-ce-cli
+          - containerd.io
+          - docker-compose-plugin
+        state: present
+        update_cache: yes
+
+    - name: Start and enable Docker service
+      systemd:
+        name: docker
+        state: started
+        enabled: yes
+        daemon_reload: yes
+
+    - name: Add ubuntu user to docker group
+      user:
+        name: ubuntu
+        groups: docker
+        append: yes
+
+    # ============ KUBERNETES (microk8s) SETUP ============
+    - name: Install microk8s
+      snap:
+        name: microk8s
+        classic: yes
+        channel: "{{ microk8s_channel }}"
+
+    - name: Start and enable microk8s
+      systemd:
+        name: snap.microk8s.daemon-kubelet
+        state: started
+        enabled: yes
+
+    - name: Wait for microk8s to be ready
+      shell: microk8s status --wait-ready
+      async: 300
+      poll: 10
+
+    - name: Add ubuntu user to microk8s group
+      user:
+        name: ubuntu
+        groups: microk8s
+        append: yes
+
+    - name: Enable microk8s DNS addon
+      shell: microk8s enable dns
+      become: yes
+      become_user: ubuntu
+      become_method: sudo
+
+    - name: Enable microk8s storage addon
+      shell: microk8s enable storage
+      become: yes
+      become_user: ubuntu
+      become_method: sudo
+
+    - name: Enable microk8s RBAC addon
+      shell: microk8s enable rbac
+      become: yes
+      become_user: ubuntu
+      become_method: sudo
+
+    - name: Enable microk8s ingress addon
+      shell: microk8s enable ingress
+      become: yes
+      become_user: ubuntu
+      become_method: sudo
+
+    # ============ KUBECTL SETUP ============
+    - name: Add Kubernetes APT key
+      apt_key:
+        url: https://packages.cloud.google.com/apt/doc/apt-key.gpg
+        state: present
+
+    - name: Add Kubernetes repository
+      apt_repository:
+        repo: deb https://apt.kubernetes.io/ kubernetes-xenial main
+        state: present
+
+    - name: Install kubectl
+      apt:
+        name: kubectl
+        state: present
+        update_cache: yes
+
+    - name: Create .kube directory for ubuntu user
+      file:
+        path: /home/ubuntu/.kube
+        state: directory
+        owner: ubuntu
+        group: ubuntu
+        mode: '0755'
+
+    - name: Copy microk8s kubeconfig
+      shell: microk8s config > /home/ubuntu/.kube/config
+      become: yes
+
+    - name: Fix kubeconfig permissions
+      file:
+        path: /home/ubuntu/.kube/config
+        owner: ubuntu
+        group: ubuntu
+        mode: '0600'
+
+    # ============ HELM SETUP ============
+    - name: Install Helm
+      shell: |
+        curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+      environment:
+        PATH: "/usr/local/bin:/usr/bin:/bin"
+
+    # ============ ARGOCD SETUP ============
+    - name: Create argocd namespace
+      shell: microk8s kubectl create namespace argocd --dry-run=client -o yaml | microk8s kubectl apply -f -
+      become: yes
+
+    - name: Install ArgoCD
+      shell: microk8s kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
+      become: yes
+
+    - name: Wait for ArgoCD deployments
+      shell: |
+        microk8s kubectl wait --for=condition=available --timeout=300s \
+          deployment/argocd-server -n argocd || true
+      become: yes
+
+    - name: Create ArgoCD ingress
+      shell: |
+        microk8s kubectl apply -f - <<EOF
+        apiVersion: networking.k8s.io/v1
+        kind: Ingress
+        metadata:
+          name: argocd-server-ingress
+          namespace: argocd
+        spec:
+          ingressClassName: nginx
+          rules:
+          - host: argocd.local
+            http:
+              paths:
+              - path: /
+                pathType: Prefix
+                backend:
+                  service:
+                    name: argocd-server
+                    port:
+                      number: 80
+        EOF
+      become: yes
+
+    # ============ CLONE APPLICATION REPO ============
+    - name: Create manifests directory
+      file:
+        path: /home/ubuntu/manifests
+        state: directory
+        owner: ubuntu
+        group: ubuntu
+        mode: '0755'
+
+    - name: Clone Online Boutique repository
+      git:
+        repo: https://github.com/GoogleCloudPlatform/microservices-demo.git
+        dest: /home/ubuntu/microservices-demo
+        version: main
+      become: yes
+      become_user: ubuntu
+
+    # ============ SYSTEM INFO ============
+    - name: Display Docker version
+      shell: docker --version
+      register: docker_version
+
+    - name: Display kubectl version
+      shell: kubectl version --client --short
+      register: kubectl_version
+
+    - name: Display microk8s status
+      shell: microk8s status
+      register: microk8s_status
+
+    - name: Print installation summary
+      debug:
+        msg:
+          - "========== INSTALLATION COMPLETE =========="
+          - "{{ docker_version.stdout }}"
+          - "{{ kubectl_version.stdout }}"
+          - "Kubernetes cluster running via microk8s"
+          - "ArgoCD deployed in argocd namespace"
+          - "Repository cloned to /home/ubuntu/microservices-demo"
+          - ""
+          - "Next steps:"
+          - "1. Create Kubernetes manifests in /home/ubuntu/manifests/"
+          - "2. Apply manifests: microk8s kubectl apply -f manifests/"
+          - "3. Configure ArgoCD with GitHub repository"
+          - "4. Enable GitHub Actions CI/CD pipeline"
+          - "==========================================="
+

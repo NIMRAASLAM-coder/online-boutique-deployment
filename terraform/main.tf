@@ -1,100 +1,233 @@
-# Copyright 2022 Google LLC
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#      http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# File: terraform/main.tf
+# This file defines the main AWS resources for the deployment
 
-# Definition of local variables
-locals {
-  base_apis = [
-    "container.googleapis.com",
-    "monitoring.googleapis.com",
-    "cloudtrace.googleapis.com",
-    "cloudprofiler.googleapis.com"
-  ]
-  memorystore_apis = ["redis.googleapis.com"]
-  cluster_name     = google_container_cluster.my_cluster.name
+terraform {
+  required_version = ">= 1.0"
+  required_providers {
+    aws = {
+      source  = "hashicorp/aws"
+      version = "~> 5.0"
+    }
+  }
 }
 
-# Enable Google Cloud APIs
-module "enable_google_apis" {
-  source  = "terraform-google-modules/project-factory/google//modules/project_services"
-  version = "~> 18.0"
-
-  project_id                  = var.gcp_project_id
-  disable_services_on_destroy = false
-
-  # activate_apis is the set of base_apis and the APIs required by user-configured deployment options
-  activate_apis = concat(local.base_apis, var.memorystore ? local.memorystore_apis : [])
+provider "aws" {
+  region = var.aws_region
 }
 
-# Create GKE cluster
-resource "google_container_cluster" "my_cluster" {
+# VPC Configuration
+resource "aws_vpc" "main" {
+  cidr_block           = var.vpc_cidr
+  enable_dns_hostnames = true
+  enable_dns_support   = true
 
-  name     = var.name
-  location = var.region
+  tags = {
+    Name        = "${var.project_name}-vpc"
+    Environment = var.environment
+  }
+}
 
-  # Enable autopilot for this cluster
-  enable_autopilot = true
+# Internet Gateway
+resource "aws_internet_gateway" "main" {
+  vpc_id = aws_vpc.main.id
 
-  # Set an empty ip_allocation_policy to allow autopilot cluster to spin up correctly
-  ip_allocation_policy {
+  tags = {
+    Name        = "${var.project_name}-igw"
+    Environment = var.environment
+  }
+}
+
+# Public Subnet
+resource "aws_subnet" "public" {
+  vpc_id                  = aws_vpc.main.id
+  cidr_block              = var.public_subnet_cidr
+  availability_zone       = data.aws_availability_zones.available.names[0]
+  map_public_ip_on_launch = true
+
+  tags = {
+    Name        = "${var.project_name}-public-subnet"
+    Environment = var.environment
+  }
+}
+
+# Private Subnet
+resource "aws_subnet" "private" {
+  vpc_id            = aws_vpc.main.id
+  cidr_block        = var.private_subnet_cidr
+  availability_zone = data.aws_availability_zones.available.names[0]
+
+  tags = {
+    Name        = "${var.project_name}-private-subnet"
+    Environment = var.environment
+  }
+}
+
+# Data source to get available AZs
+data "aws_availability_zones" "available" {
+  state = "available"
+}
+
+# Route Table for Public Subnet
+resource "aws_route_table" "public" {
+  vpc_id = aws_vpc.main.id
+
+  route {
+    cidr_block      = "0.0.0.0/0"
+    gateway_id      = aws_internet_gateway.main.id
   }
 
-  # Avoid setting deletion_protection to false
-  # until you're ready (and certain you want) to destroy the cluster.
-  # deletion_protection = false
-
-  depends_on = [
-    module.enable_google_apis
-  ]
+  tags = {
+    Name        = "${var.project_name}-public-rt"
+    Environment = var.environment
+  }
 }
 
-# Get credentials for cluster
-module "gcloud" {
-  source  = "terraform-google-modules/gcloud/google"
-  version = "~> 4.0"
-
-  platform              = "linux"
-  additional_components = ["kubectl", "beta"]
-
-  create_cmd_entrypoint = "gcloud"
-  # Module does not support explicit dependency
-  # Enforce implicit dependency through use of local variable
-  create_cmd_body = "container clusters get-credentials ${local.cluster_name} --zone=${var.region} --project=${var.gcp_project_id}"
+# Associate Route Table with Public Subnet
+resource "aws_route_table_association" "public" {
+  subnet_id      = aws_subnet.public.id
+  route_table_id = aws_route_table.public.id
 }
 
-# Apply YAML kubernetes-manifest configurations
-resource "null_resource" "apply_deployment" {
-  provisioner "local-exec" {
-    interpreter = ["bash", "-exc"]
-    command     = "kubectl apply -k ${var.filepath_manifest} -n ${var.namespace}"
+# Security Group for EC2
+resource "aws_security_group" "ec2" {
+  name_prefix = "${var.project_name}-ec2-"
+  description = "Security group for Online Boutique EC2 instance"
+  vpc_id      = aws_vpc.main.id
+
+  # SSH access (restricted to your IP in production)
+  ingress {
+    from_port   = 22
+    to_port     = 22
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]  # Change to your IP in production: ["YOUR.IP.ADDRESS/32"]
   }
 
-  depends_on = [
-    module.gcloud
-  ]
-}
-
-# Wait condition for all Pods to be ready before finishing
-resource "null_resource" "wait_conditions" {
-  provisioner "local-exec" {
-    interpreter = ["bash", "-exc"]
-    command     = <<-EOT
-    kubectl wait --for=condition=AVAILABLE apiservice/v1beta1.metrics.k8s.io --timeout=180s
-    kubectl wait --for=condition=ready pods --all -n ${var.namespace} --timeout=280s
-    EOT
+  # HTTP
+  ingress {
+    from_port   = 80
+    to_port     = 80
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
   }
 
-  depends_on = [
-    resource.null_resource.apply_deployment
-  ]
+  # HTTPS
+  ingress {
+    from_port   = 443
+    to_port     = 443
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  # Kubernetes API (microk8s default)
+  ingress {
+    from_port   = 16443
+    to_port     = 16443
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  # Application ports (8080, 3000, 9000, etc.)
+  ingress {
+    from_port   = 3000
+    to_port     = 9000
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  # All traffic outbound
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  tags = {
+    Name        = "${var.project_name}-ec2-sg"
+    Environment = var.environment
+  }
 }
+
+# EC2 Instance
+resource "aws_instance" "k8s_master" {
+  ami                    = data.aws_ami.ubuntu.id
+  instance_type          = var.instance_type
+  subnet_id              = aws_subnet.public.id
+  vpc_security_group_ids = [aws_security_group.ec2.id]
+  key_name               = var.key_pair_name
+
+  root_block_device {
+    volume_type           = "gp3"
+    volume_size           = var.root_volume_size
+    delete_on_termination = true
+    encrypted             = false
+
+    tags = {
+      Name        = "${var.project_name}-root-volume"
+      Environment = var.environment
+    }
+  }
+
+  # User data script to bootstrap the instance
+  user_data = base64encode(templatefile("${path.module}/user_data.sh", {
+    project_name = var.project_name
+  }))
+
+  tags = {
+    Name        = "${var.project_name}-master"
+    Environment = var.environment
+  }
+
+  depends_on = [aws_internet_gateway.main]
+}
+
+# Elastic IP for EC2 (so IP doesn't change on stop/start)
+resource "aws_eip" "k8s_master" {
+  instance = aws_instance.k8s_master.id
+  domain   = "vpc"
+
+  tags = {
+    Name        = "${var.project_name}-eip"
+    Environment = var.environment
+  }
+
+  depends_on = [aws_internet_gateway.main]
+}
+
+# Data source to get latest Ubuntu AMI
+data "aws_ami" "ubuntu" {
+  most_recent = true
+  owners      = ["099720109477"]  # Canonical (Ubuntu official)
+
+  filter {
+    name   = "name"
+    values = ["ubuntu/images/hvm-ssd/ubuntu-focal-20.04-amd64-server-*"]
+  }
+
+  filter {
+    name   = "virtualization-type"
+    values = ["hvm"]
+  }
+}
+
+# CloudWatch monitoring (optional)
+resource "aws_cloudwatch_metric_alarm" "ec2_cpu" {
+  alarm_name          = "${var.project_name}-ec2-cpu-high"
+  comparison_operator = "GreaterThanThreshold"
+  evaluation_periods  = "2"
+  metric_name         = "CPUUtilization"
+  namespace           = "AWS/EC2"
+  period              = "300"
+  statistic           = "Average"
+  threshold           = "80"
+  alarm_description   = "Alert when EC2 CPU exceeds 80%"
+
+  dimensions = {
+    InstanceId = aws_instance.k8s_master.id
+  }
+
+  tags = {
+    Environment = var.environment
+  }
+}
+
