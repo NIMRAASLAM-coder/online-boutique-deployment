@@ -18,18 +18,29 @@ jobs:
   build-and-push:
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
-        service:
-          - frontend
-          - adservice
-          - cartservice
-          - checkoutservice
-          - currencyservice
-          - emailservice
-          - paymentservice
-          - productcatalogservice
-          - recommendationservice
-          - shippingservice
+        include:
+          - service: frontend
+            dockerfile: ./src/frontend/Dockerfile
+          - service: adservice
+            dockerfile: ./src/adservice/Dockerfile
+          - service: cartservice
+            dockerfile: ./src/cartservice/src/Dockerfile # Specific path for .NET
+          - service: checkoutservice
+            dockerfile: ./src/checkoutservice/Dockerfile
+          - service: currencyservice
+            dockerfile: ./src/currencyservice/Dockerfile
+          - service: emailservice
+            dockerfile: ./src/emailservice/Dockerfile
+          - service: paymentservice
+            dockerfile: ./src/paymentservice/Dockerfile
+          - service: productcatalogservice
+            dockerfile: ./src/productcatalogservice/Dockerfile
+          - service: recommendationservice
+            dockerfile: ./src/recommendationservice/Dockerfile
+          - service: shippingservice
+            dockerfile: ./src/shippingservice/Dockerfile
     
     steps:
       - name: Checkout code
@@ -61,7 +72,7 @@ jobs:
         uses: docker/build-push-action@v4
         with:
           context: ./src/${{ matrix.service }}
-          file: ./src/${{ matrix.service }}/Dockerfile
+          file: ./src/${{ matrix.dockerfiler }}
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
