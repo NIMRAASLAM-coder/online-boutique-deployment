@@ -1,0 +1,104 @@
+# File: kubernetes/frontend.yaml
+# Frontend Service and Deployment
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: frontend
+  namespace: boutique
+  labels:
+    app: frontend
+spec:
+  type: LoadBalancer  # Exposes the service externally
+  ports:
+  - name: http
+    port: 80
+    targetPort: 3000
+    protocol: TCP
+  selector:
+    app: frontend
+  sessionAffinity: None
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend
+  namespace: boutique
+  labels:
+    app: frontend
+spec:
+  replicas: 2  # Run 2 instances for high availability
+  selector:
+    matchLabels:
+      app: frontend
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 1
+  template:
+    metadata:
+      labels:
+        app: frontend
+    spec:
+      containers:
+      - name: frontend
+        # IMPORTANT: Replace YOUR-DOCKER-HUB-USERNAME with your actual Docker Hub username
+        image: YOUR-DOCKER-HUB-USERNAME/online-boutique-frontend:latest
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 3000
+          name: http
+        
+        env:
+        - name: LOG_LEVEL
+          valueFrom:
+            configMapKeyRef:
+              name: online-boutique-config
+              key: LOG_LEVEL
+        - name: FRONTEND_ADDR
+          valueFrom:
+            configMapKeyRef:
+              name: online-boutique-config
+              key: FRONTEND_ADDR
+        
+        # Resource requests and limits
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 200m
+            memory: 256Mi
+        
+        # Liveness probe: restart if unhealthy
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 3000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        
+        # Readiness probe: don't send traffic if not ready
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 3000
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 2
+        
+        # Security context
+        securityContext:
+          runAsNonRoot: true
+          readOnlyRootFilesystem: true
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+

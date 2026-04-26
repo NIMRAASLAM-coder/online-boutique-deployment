@@ -1,0 +1,60 @@
+# File: kubernetes/argocd-application.yaml
+# ArgoCD Application - defines how ArgoCD syncs the Kubernetes cluster with Git repo
+
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: online-boutique
+  namespace: argocd
+spec:
+  # Project to use for this application
+  project: default
+  
+  # Source: where to get the Kubernetes manifests (GitHub repo)
+  source:
+    # IMPORTANT: Replace with your GitHub repository
+    repoURL: https://github.com/YOUR-USERNAME/online-boutique-deployment.git
+    targetRevision: main
+    path: kubernetes  # Path to Kubernetes manifests in the repo
+    
+    # Optional: Use Helm to render manifests
+    # helm:
+    #   releaseName: online-boutique
+    #   values: |
+    #     # Helm values here
+  
+  # Destination: where to deploy (your Kubernetes cluster)
+  destination:
+    server: https://kubernetes.default.svc  # Local cluster
+    namespace: boutique
+  
+  # Sync policy: how ArgoCD should manage the deployment
+  syncPolicy:
+    # Automatic sync: ArgoCD will automatically apply changes from Git
+    automated:
+      prune: true      # Delete resources that are no longer in Git
+      selfHeal: true   # Rollback manual changes in cluster
+    
+    # Sync options
+    syncOptions:
+    - CreateNamespace=true  # Create namespace if it doesn't exist
+    
+    # Retry policy
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+  
+  # Health assessment
+  health:
+    enabled: true
+  
+  # Ignore differences (optional)
+  ignoreDifferences:
+  - group: apps
+    kind: Deployment
+    jsonPointers:
+    - /spec/replicas  # Ignore replica changes if using HPA
+

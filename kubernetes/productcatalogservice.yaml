@@ -1,0 +1,75 @@
+# File: kubernetes/productcatalogservice.yaml
+# ProductCatalogService - serves product catalog
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: productcatalogservice
+  namespace: boutique
+  labels:
+    app: productcatalogservice
+spec:
+  type: ClusterIP
+  ports:
+  - name: grpc
+    port: 3550
+    targetPort: 3550
+    protocol: TCP
+  selector:
+    app: productcatalogservice
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: productcatalogservice
+  namespace: boutique
+  labels:
+    app: productcatalogservice
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: productcatalogservice
+  template:
+    metadata:
+      labels:
+        app: productcatalogservice
+    spec:
+      containers:
+      - name: productcatalogservice
+        image: YOUR-DOCKER-HUB-USERNAME/online-boutique-productcatalogservice:latest
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 3550
+          name: grpc
+        
+        env:
+        - name: PORT
+          value: "3550"
+        - name: DISABLE_STATS
+          value: "1"
+        - name: DISABLE_TRACING
+          value: "1"
+        
+        resources:
+          requests:
+            cpu: 100m
+            memory: 64Mi
+          limits:
+            cpu: 200m
+            memory: 128Mi
+        
+        livenessProbe:
+          grpc:
+            port: 3550
+          initialDelaySeconds: 15
+          periodSeconds: 10
+        
+        readinessProbe:
+          grpc:
+            port: 3550
+          initialDelaySeconds: 15
+          periodSeconds: 5
+
