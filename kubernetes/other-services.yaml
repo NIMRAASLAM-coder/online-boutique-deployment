@@ -35,7 +35,7 @@ spec:
     spec:
       containers:
       - name: checkoutservice
-        image: YOUR-DOCKER-HUB-USERNAME/online-boutique-checkoutservice:latest
+        image: gcr.io/google-samples/microservices-demo/checkoutservice:v0.3.9
         ports:
         - containerPort: 5050
         resources:
@@ -80,7 +80,7 @@ spec:
     spec:
       containers:
       - name: currencyservice
-        image: YOUR-DOCKER-HUB-USERNAME/online-boutique-currencyservice:latest
+        image: gcr.io/google-samples/microservices-demo/currencyservice:v0.3.9
         ports:
         - containerPort: 7000
         resources:
@@ -125,7 +125,7 @@ spec:
     spec:
       containers:
       - name: shippingservice
-        image: YOUR-DOCKER-HUB-USERNAME/online-boutique-shippingservice:latest
+        image: gcr.io/google-samples/microservices-demo/shippingservice:v0.3.9
         ports:
         - containerPort: 50051
         resources:
@@ -170,7 +170,7 @@ spec:
     spec:
       containers:
       - name: paymentservice
-        image: YOUR-DOCKER-HUB-USERNAME/online-boutique-paymentservice:latest
+        image: gcr.io/google-samples/microservices-demo/paymentservice:v0.3.9
         ports:
         - containerPort: 50051
         resources:
@@ -215,7 +215,7 @@ spec:
     spec:
       containers:
       - name: emailservice
-        image: YOUR-DOCKER-HUB-USERNAME/online-boutique-emailservice:latest
+        image: gcr.io/google-samples/microservices-demo/emailservice:v0.3.9
         ports:
         - containerPort: 5000
         resources:
@@ -260,7 +260,7 @@ spec:
     spec:
       containers:
       - name: recommendationservice
-        image: YOUR-DOCKER-HUB-USERNAME/online-boutique-recommendationservice:latest
+        image: gcr.io/google-samples/microservices-demo/recommendationservice:v0.3.9
         ports:
         - containerPort: 8080
         resources:
@@ -305,7 +305,7 @@ spec:
     spec:
       containers:
       - name: adservice
-        image: YOUR-DOCKER-HUB-USERNAME/online-boutique-adservice:latest
+        image: gcr.io/google-samples/microservices-demo/adservice:v0.3.9
         ports:
         - containerPort: 9090
         resources:

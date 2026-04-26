@@ -39,7 +39,7 @@ spec:
     spec:
       containers:
       - name: productcatalogservice
-        image: YOUR-DOCKER-HUB-USERNAME/online-boutique-productcatalogservice:latest
+        image: gcr.io/google-samples/microservices-demo/productcatalogservice:v0.3.9
         imagePullPolicy: Always
         ports:
         - containerPort: 3550

@@ -45,8 +45,8 @@ spec:
     spec:
       containers:
       - name: frontend
-        # IMPORTANT: Replace YOUR-DOCKER-HUB-USERNAME with your actual Docker Hub username
-        image: YOUR-DOCKER-HUB-USERNAME/online-boutique-frontend:latest
+        # IMPORTANT: Replace i221164nimra with your actual Docker Hub username
+        image: gcr.io/google-samples/microservices-demo/frontend:v0.3.9
         imagePullPolicy: Always
         ports:
         - containerPort: 3000
