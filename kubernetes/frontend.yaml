@@ -92,13 +92,4 @@ spec:
           periodSeconds: 5
           timeoutSeconds: 3
           failureThreshold: 2
-        
-        # Security context
-        securityContext:
-          runAsNonRoot: true
-          readOnlyRootFilesystem: true
-          allowPrivilegeEscalation: false
-          capabilities:
-            drop:
-            - ALL
 
